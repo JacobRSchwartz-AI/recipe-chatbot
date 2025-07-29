@@ -1,27 +1,37 @@
-version: '3.8'
-
 services:
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SERP_API_KEY=${SERP_API_KEY}
-      - ENVIRONMENT=development
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    env_file:
+      - .env
     volumes:
+      # Only mount for development
       - ./backend:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=${NODE_ENV:-development}
+    env_file:
+      - .env
     volumes:
+      # Only mount for development
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     command: npm run dev
     depends_on:
       - backend
