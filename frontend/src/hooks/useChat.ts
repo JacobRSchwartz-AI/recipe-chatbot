@@ -89,7 +89,12 @@ export const useChat = () => {
           },
           // onContentChunk
           (chunk: string) => {
-            assistantContent += chunk; // Append instead of overwrite
+            // Add space between chunks if assistantContent already exists and doesn't end with space
+            if (assistantContent && !assistantContent.endsWith(' ') && !chunk.startsWith(' ')) {
+              assistantContent += ' ' + chunk;
+            } else {
+              assistantContent += chunk;
+            }
             updateMessage(assistantMessageId, { 
               content: assistantContent,
               status: undefined,

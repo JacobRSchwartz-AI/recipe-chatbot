@@ -45,16 +45,21 @@ class CookwareChecker:
             3. What items are missing (if any)
             4. Suggested alternatives or modifications
             
-            Respond with ONLY a JSON object in this exact format:
+            CRITICAL: You must respond with ONLY a valid JSON object. Do not include any markdown, explanations, or other text.
+            
+            Use this EXACT format (copy exactly):
             {{
-                "can_make": true/false,
+                "can_make": true,
                 "required_items": ["item1", "item2"],
                 "available_items": ["item1", "item2"],
-                "missing_items": ["item1", "item2"],
-                "confidence": 0.0-1.0,
+                "missing_items": [],
+                "confidence": 0.8,
                 "suggestions": "Brief suggestions for alternatives or modifications",
                 "reasoning": "Brief explanation of the analysis"
             }}
+            
+            Replace the values appropriately but keep the exact structure and field names.
+            The confidence should be a number between 0.0 and 1.0.
             """
             
             messages = [
@@ -65,23 +70,61 @@ class CookwareChecker:
             response = self.llm(messages)
             result_text = response.content.strip()
             
-            # Parse the JSON response
+            # Parse the JSON response with better error handling
             import json
+            import re
+            
             try:
+                # First, try to parse directly
                 result = json.loads(result_text)
-                logger.info(f"Cookware check completed: can_make={result.get('can_make', False)}")
-                return result
+                
+                # Validate that the result has the expected structure
+                required_fields = ["can_make", "required_items", "available_items", "missing_items", "confidence", "suggestions", "reasoning"]
+                if all(field in result for field in required_fields):
+                    # Ensure lists are actually lists
+                    for list_field in ["required_items", "available_items", "missing_items"]:
+                        if not isinstance(result[list_field], list):
+                            result[list_field] = []
+                    
+                    # Ensure confidence is a number between 0 and 1
+                    if not isinstance(result["confidence"], (int, float)) or not (0 <= result["confidence"] <= 1):
+                        result["confidence"] = 0.5
+                    
+                    # Ensure can_make is boolean
+                    if not isinstance(result["can_make"], bool):
+                        result["can_make"] = True
+                    
+                    logger.info(f"Cookware check completed: can_make={result.get('can_make', False)}")
+                    return result
+                else:
+                    logger.error(f"Parsed JSON missing required fields. Got: {list(result.keys())}")
+                    raise json.JSONDecodeError("Missing required fields", result_text, 0)
+                    
             except json.JSONDecodeError:
-                logger.error(f"Failed to parse cookware check response: {result_text}")
-                # Fallback response
+                # If direct parsing fails, try to extract JSON from the response
+                logger.warning(f"Direct JSON parsing failed. Attempting to extract JSON from: {result_text[:200]}...")
+                
+                # Look for JSON object in the response using regex
+                json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                if json_match:
+                    try:
+                        json_text = json_match.group(0)
+                        result = json.loads(json_text)
+                        logger.info(f"Successfully extracted JSON from response: can_make={result.get('can_make', False)}")
+                        return result
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse extracted JSON: {json_text[:200]}")
+                
+                # If all parsing attempts fail, log the full response and return fallback
+                logger.error(f"Complete response that failed to parse: {result_text}")
                 return {
                     "can_make": True,
                     "required_items": [],
                     "available_items": self.available_cookware,
                     "missing_items": [],
                     "confidence": 0.5,
-                    "suggestions": "Unable to analyze cookware requirements",
-                    "reasoning": "Failed to parse analysis response"
+                    "suggestions": "Unable to analyze cookware requirements - response parsing failed",
+                    "reasoning": f"Failed to parse LLM response as JSON. Response: {result_text[:100]}..."
                 }
                 
         except Exception as e:

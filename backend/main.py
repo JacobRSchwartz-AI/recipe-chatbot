@@ -123,7 +123,9 @@ async def chat_stream_endpoint(message: StreamingChatMessage):
                     
                     # Send chunk every 5-8 words or at the end
                     if (i + 1) % 6 == 0 or i == len(words) - 1:
-                        yield f"data: {json.dumps({'type': 'content', 'data': current_chunk.strip()})}\n\n"
+                        # For final chunk, strip trailing space; for others, keep it
+                        chunk_to_send = current_chunk.rstrip() if i == len(words) - 1 else current_chunk
+                        yield f"data: {json.dumps({'type': 'content', 'data': chunk_to_send})}\n\n"
                         current_chunk = ""
                         await asyncio.sleep(0.05)  # Small delay between chunks
             

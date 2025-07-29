@@ -127,18 +127,28 @@ class RecipeGraph:
             "recipe for", "how to make", "how do i", "recipe", "instructions"
         ])
         
-        needs_cookware_check = any(keyword in user_message for keyword in [
-            "can i make", "do i have", "available", "cookware", "tools", "equipment"
-        ])
+        # For cooking-related queries, always check cookware unless explicitly asking about something else
+        needs_cookware_check = True  # Default to always checking cookware for cooking queries
         
-        # Default to web search for most cooking queries
-        if not needs_web_search and not needs_cookware_check:
+        # Only skip cookware check for very specific non-cooking or informational queries
+        skip_cookware_keywords = [
+            "what is", "define", "explain", "tell me about", "history of", 
+            "nutrition", "calories", "where does", "when was", "who invented"
+        ]
+        
+        if any(keyword in user_message for keyword in skip_cookware_keywords):
+            needs_cookware_check = False
+        
+        # Default to web search for most cooking queries if no specific tool trigger
+        if not needs_web_search and needs_cookware_check:
             needs_web_search = True
             
         state["debug_info"]["tool_decisions"] = {
             "needs_web_search": needs_web_search,
             "needs_cookware_check": needs_cookware_check
         }
+        
+        logger.info(f"Tool decisions: web_search={needs_web_search}, cookware_check={needs_cookware_check}")
         
         return state
     
@@ -263,16 +273,27 @@ Please provide a helpful cooking response."""
         debug_info = state.get("debug_info", {})
         tool_decisions = debug_info.get("tool_decisions", {})
         
-        # If we did web search and originally needed cookware check, do it
+        # If we explicitly decided we need cookware check, do it
         if tool_decisions.get("needs_cookware_check", False):
             return "yes"
         
-        # Also check cookware for most recipe queries
+        # For any cooking-related query that went through web search, also check cookware
+        # This ensures we almost always check cookware for recipe-related queries
         user_message = state["user_message"].lower()
-        if any(keyword in user_message for keyword in ["recipe", "make", "cook"]):
-            return "yes"
         
-        return "no"
+        # Skip cookware check only for very specific informational queries
+        skip_cookware_keywords = [
+            "what is", "define", "explain", "tell me about", "history of", 
+            "nutrition", "calories", "where does", "when was", "who invented"
+        ]
+        
+        if any(keyword in user_message for keyword in skip_cookware_keywords):
+            logger.info("Skipping cookware check for informational query")
+            return "no"
+        
+        # Default to yes for all other cooking queries
+        logger.info("Including cookware check for recipe/cooking query")
+        return "yes"
     
     def run(self, user_message: str) -> Dict[str, Any]:
         """Run the complete workflow for a user message."""

@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { Message } from '@/lib/types';
 import { formatTime, cn } from '@/lib/utils';
+import MarkdownMessage from './MarkdownMessage';
+import AnimatedDots from './AnimatedDots';
+import { CopyIcon, CheckIcon } from '@radix-ui/react-icons';
 
 interface MessageBubbleProps {
   message: Message;
@@ -7,23 +11,63 @@ interface MessageBubbleProps {
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
   
   return (
     <div className={cn('flex w-full mb-4', isUser ? 'justify-end' : 'justify-start')}>
-      <div className={cn('max-w-[80%] rounded-lg px-4 py-2', {
+      <div className={cn('max-w-[80%] rounded-lg px-4 py-2 relative group', {
         'bg-blue-500 text-white': isUser,
         'bg-gray-100 text-gray-900': !isUser,
       })}>
+        {/* Copy button for assistant messages */}
+        {!isUser && message.content && (
+          <button
+            onClick={handleCopy}
+            className="absolute top-2 right-2 p-1 rounded hover:bg-gray-200 hover:bg-opacity-80 transition-colors duration-200 opacity-0 group-hover:opacity-100"
+            title={copied ? 'Copied!' : 'Copy message'}
+          >
+            {copied ? (
+              <CheckIcon className="w-4 h-4 text-green-600" />
+            ) : (
+              <CopyIcon className="w-4 h-4 text-gray-600" />
+            )}
+          </button>
+        )}
+        
         {/* Show streaming status for assistant messages */}
         {!isUser && message.isStreaming && message.status && (
           <div className="text-sm text-gray-600 italic mb-2 flex items-center">
             <div className="animate-pulse w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-            {message.status}
+            {message.status.endsWith('...') ? (
+              <>
+                {message.status.slice(0, -3)}
+                <AnimatedDots />
+              </>
+            ) : (
+              message.status
+            )}
           </div>
         )}
         
-        <div className="whitespace-pre-wrap break-words">
-          {message.content}
+        <div className={cn("whitespace-pre-wrap break-words", {
+          "pr-8": !isUser && message.content, // Add right padding for copy button
+        })}>
+          {/* Use MarkdownMessage for assistant messages, plain text for user messages */}
+          {isUser ? (
+            message.content
+          ) : (
+            <MarkdownMessage isInChatBubble={true}>{message.content}</MarkdownMessage>
+          )}
           {!isUser && message.isStreaming && !message.status && (
             <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1"></span>
           )}
