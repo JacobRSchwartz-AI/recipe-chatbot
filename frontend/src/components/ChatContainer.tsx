@@ -67,8 +67,8 @@ export default function ChatContainer() {
             <MessageBubble key={message.id} message={message} />
           ))}
 
-          {/* Loading Indicator */}
-          {isLoading && <LoadingIndicator />}
+          {/* Loading Indicator - only show if loading and no streaming messages */}
+          {isLoading && !messages.some(msg => msg.isStreaming) && <LoadingIndicator />}
 
           {/* Scroll anchor */}
           <div ref={messagesEndRef} />

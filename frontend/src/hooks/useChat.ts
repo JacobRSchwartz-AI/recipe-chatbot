@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Message, ChatState } from '@/lib/types';
-import { sendMessage } from '@/lib/api';
+import { sendMessage, sendMessageStream } from '@/lib/api';
 import { generateId } from '@/lib/utils';
 
 export const useChat = () => {
@@ -17,6 +17,15 @@ export const useChat = () => {
     }));
   }, []);
 
+  const updateMessage = useCallback((messageId: string, updates: Partial<Message>) => {
+    setState(prev => ({
+      ...prev,
+      messages: prev.messages.map(msg => 
+        msg.id === messageId ? { ...msg, ...updates } : msg
+      ),
+    }));
+  }, []);
+
   const setLoading = useCallback((loading: boolean) => {
     setState(prev => ({ ...prev, isLoading: loading }));
   }, []);
@@ -25,7 +34,7 @@ export const useChat = () => {
     setState(prev => ({ ...prev, error }));
   }, []);
 
-  const sendUserMessage = useCallback(async (content: string) => {
+  const sendUserMessage = useCallback(async (content: string, useStreaming: boolean = true) => {
     if (!content.trim()) return;
 
     // Add user message
@@ -41,39 +50,120 @@ export const useChat = () => {
     setLoading(true);
     setError(null);
 
-    try {
-      // Call API
-      const response = await sendMessage(content.trim());
+    if (useStreaming) {
+      // Use streaming API
+      const assistantMessageId = generateId();
+      let assistantContent = '';
+      let statusContent = '';
+      let currentMetadata: any = {};
 
-      // Add assistant response
+      // Add initial assistant message
       const assistantMessage: Message = {
-        id: generateId(),
-        content: response.response,
+        id: assistantMessageId,
+        content: '',
         role: 'assistant',
         timestamp: new Date(),
-        metadata: {
-          tools_used: response.tools_used,
-          cookware_check: response.cookware_check,
-          is_cooking_related: response.is_cooking_related,
-          debug_info: response.debug_info,
-        },
+        isStreaming: true,
+        status: 'Processing your request...',
       };
       addMessage(assistantMessage);
-    } catch (error: any) {
-      setError(error.message);
-      
-      // Add error message from assistant
-      const errorMessage: Message = {
-        id: generateId(),
-        content: `Sorry, I encountered an error: ${error.message}`,
-        role: 'assistant',
-        timestamp: new Date(),
-      };
-      addMessage(errorMessage);
-    } finally {
-      setLoading(false);
+
+      try {
+        await sendMessageStream(
+          content.trim(),
+          // onStatusUpdate
+          (status: string) => {
+            statusContent = status;
+            updateMessage(assistantMessageId, { 
+              status,
+              isStreaming: true 
+            });
+          },
+          // onToolUpdate
+          (tool: string) => {
+            statusContent = tool;
+            updateMessage(assistantMessageId, { 
+              status: tool,
+              isStreaming: true 
+            });
+          },
+          // onContentChunk
+          (chunk: string) => {
+            assistantContent += chunk; // Append instead of overwrite
+            updateMessage(assistantMessageId, { 
+              content: assistantContent,
+              status: undefined,
+              isStreaming: true 
+            });
+          },
+          // onComplete
+          (metadata: any) => {
+            currentMetadata = metadata;
+            updateMessage(assistantMessageId, { 
+              content: assistantContent,
+              isStreaming: false,
+              status: undefined,
+              metadata: {
+                tools_used: metadata.tools_used,
+                cookware_check: metadata.cookware_check,
+                is_cooking_related: metadata.is_cooking_related,
+                debug_info: metadata.debug_info,
+              },
+            });
+          },
+          // onError
+          (error: string) => {
+            setError(error);
+            updateMessage(assistantMessageId, { 
+              content: `Sorry, I encountered an error: ${error}`,
+              isStreaming: false,
+              status: undefined,
+            });
+          }
+        );
+      } catch (error: any) {
+        setError(error.message);
+        updateMessage(assistantMessageId, { 
+          content: `Sorry, I encountered an error: ${error.message}`,
+          isStreaming: false,
+          status: undefined,
+        });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Use traditional API (fallback)
+      try {
+        const response = await sendMessage(content.trim());
+
+        const assistantMessage: Message = {
+          id: generateId(),
+          content: response.response,
+          role: 'assistant',
+          timestamp: new Date(),
+          metadata: {
+            tools_used: response.tools_used,
+            cookware_check: response.cookware_check,
+            is_cooking_related: response.is_cooking_related,
+            debug_info: response.debug_info,
+          },
+        };
+        addMessage(assistantMessage);
+      } catch (error: any) {
+        setError(error.message);
+        
+        const errorMessage: Message = {
+          id: generateId(),
+          content: `Sorry, I encountered an error: ${error.message}`,
+          role: 'assistant',
+          timestamp: new Date(),
+        };
+        addMessage(errorMessage);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [addMessage, setLoading, setError]);
+  }, [addMessage, updateMessage, setLoading, setError]);
 
   return {
     messages: state.messages,

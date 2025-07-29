@@ -14,12 +14,23 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         'bg-blue-500 text-white': isUser,
         'bg-gray-100 text-gray-900': !isUser,
       })}>
+        {/* Show streaming status for assistant messages */}
+        {!isUser && message.isStreaming && message.status && (
+          <div className="text-sm text-gray-600 italic mb-2 flex items-center">
+            <div className="animate-pulse w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+            {message.status}
+          </div>
+        )}
+        
         <div className="whitespace-pre-wrap break-words">
           {message.content}
+          {!isUser && message.isStreaming && !message.status && (
+            <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1"></span>
+          )}
         </div>
         
         {/* Show metadata for assistant messages */}
-        {!isUser && message.metadata && (
+        {!isUser && message.metadata && !message.isStreaming && (
           <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
             {message.metadata.tools_used && message.metadata.tools_used.length > 0 && (
               <div className="mb-1">

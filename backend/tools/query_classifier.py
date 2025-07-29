@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class QueryClassifier:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             temperature=0.1,
             openai_api_key=os.getenv("OPENAI_API_KEY")
         )

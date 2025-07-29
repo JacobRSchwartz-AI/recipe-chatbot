@@ -5,6 +5,10 @@ class ChatMessage(BaseModel):
     message: str
     user_id: Optional[str] = "default"
 
+class StreamingChatMessage(BaseModel):
+    message: str
+    user_id: Optional[str] = "default"
+
 class ChatResponse(BaseModel):
     response: str
     is_cooking_related: bool

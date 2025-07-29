@@ -43,15 +43,16 @@ OPENAI_API_KEY=your_openai_key_here
 SERP_API_KEY=your_serp_key_here
 ```
 
-### Running with Docker
+### Running with Docker (Recommended)
 
 ```bash
 # Build and start all services
 docker-compose up --build
-
-# Backend will be available at http://localhost:8000
-# Frontend will be available at http://localhost:3000
 ```
+
+- Backend will be available at http://localhost:8000
+- Frontend will be available at http://localhost:3000
+- Both services support hot reload for development
 
 ### Running Locally (Development)
 
@@ -71,13 +72,29 @@ npm run dev
 
 ## API Usage
 
-### Chat Endpoint
+### Chat Endpoint (Traditional)
 
 ```bash
 curl -X POST "http://localhost:8000/api/chat" \
   -H "Content-Type: application/json" \
   -d '{"message": "How do I make scrambled eggs?"}'
 ```
+
+### Streaming Chat Endpoint (SSE)
+
+```bash
+curl -X POST "http://localhost:8000/api/chat/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "How do I make scrambled eggs?"}' \
+  --no-buffer
+```
+
+The streaming endpoint returns Server-Sent Events with different event types:
+- `status`: Processing updates (e.g., "Analyzing your cooking question...")
+- `tool`: Tool usage notifications (e.g., "Using web_search tool...")
+- `content`: Streaming response content in chunks
+- `complete`: Final metadata with tools used, cookware check, etc.
+- `error`: Error messages
 
 ### Health Check
 
@@ -93,8 +110,10 @@ curl http://localhost:8000/health
 - ✅ Web search integration for recipe research
 - ✅ Next.js chat interface with TypeScript
 - ✅ Docker containerization
-- ⏳ Streaming responses (planned)
+- ✅ **Streaming responses with real-time updates**
+- ✅ **Live status updates during processing**
 - ⏳ Enhanced UI components (planned)
+- ⏳ Markdown support for recipes (planned)
 
 ## Available Cookware
 
@@ -115,20 +134,23 @@ This is a work-in-progress implementation for the AI Engineer assessment.
 ### Completed
 - [x] Monorepo scaffolding
 - [x] Docker setup
-- [x] Basic FastAPI structure
-- [x] Next.js 15 setup
-- [x] Core schemas and models
+- [x] FastAPI structure with traditional and streaming endpoints
+- [x] Next.js 15 setup with TypeScript
+- [x] LangGraph implementation with conditional workflows
+- [x] Tool integrations (query classifier, web search, cookware checker)
+- [x] Frontend chat interface with streaming support
+- [x] Real-time status updates and visual feedback
+- [x] End-to-end functionality
 
 ### In Progress
-- [ ] LangGraph implementation
-- [ ] Tool integrations
-- [ ] Frontend chat interface
-- [ ] End-to-end testing
+- [ ] Markdown support for recipe formatting
+- [ ] Enhanced error handling and retries
+- [ ] Unit tests for core components
 
 ### Planned
-- [ ] Streaming responses
-- [ ] Enhanced error handling
-- [ ] Unit tests
+- [ ] shadcn/ui component migration
+- [ ] Copy-to-clipboard functionality
+- [ ] Recipe card components
 - [ ] CI/CD pipeline
 
 ## Design Decisions
@@ -137,6 +159,9 @@ This is a work-in-progress implementation for the AI Engineer assessment.
 - **FastAPI**: Fast, type-safe API development with automatic OpenAPI docs
 - **Next.js 15 App Router**: Modern React framework with TypeScript support
 - **Docker Compose**: Simplified multi-service development environment
+- **Server-Sent Events for streaming**: Provides real-time updates without WebSocket complexity
+- **Dual API approach**: Both traditional REST and streaming endpoints for flexibility
+- **Component-based streaming state**: UI updates reflect real-time processing stages
 
 ## Next Steps
 
